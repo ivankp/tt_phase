@@ -27,8 +27,6 @@ using std::get;
 using ivanp::cat;
 using namespace ivanp::math;
 
-double hj_mass;
-
 class mass_bin {
   std::ofstream f;
 public:
@@ -102,8 +100,7 @@ int main(int argc, char* argv[]) {
     // --------------------------------------------------------------
 
     const auto Q = Higgs + jets;
-    const double Q2 = Q*Q;
-    hj_mass = std::sqrt(Q2);
+    const double Q2 = Q*Q; // Mass^2
 
     const vec4 Z(0,0,Q[3],Q[2]);
     const auto ell = ((Q*jets)/Q2)*Higgs - ((Q*Higgs)/Q2)*jets;
@@ -113,7 +110,7 @@ int main(int argc, char* argv[]) {
 
     event.weight = (*_weight);
 
-    files(hj_mass);
+    files(std::sqrt(Q2));
   }
 }
 
