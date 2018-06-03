@@ -1,18 +1,21 @@
 #include <iostream>
+#include <fstream>
 
 #include <TChain.h>
 #include <TTreeReader.h>
 #include <TTreeReaderValue.h>
 #include <TTreeReaderArray.h>
 
+#include "ivanp/string.hh"
 #include "ivanp/math/math.hh"
 #include "ivanp/program_options.hh"
 #include "ivanp/timed_counter.hh"
-#include "ivanp/string.hh"
+#include "ivanp/binner.hh"
 
 #include "float_or_double_reader.hh"
 #include "iftty.hh"
 #include "vec4.hh"
+#include "event.hh"
 
 #define TEST(var) \
   std::cout << "\033[36m" #var "\033[0m = " << var << std::endl;
@@ -24,13 +27,14 @@ using std::get;
 using ivanp::cat;
 using namespace ivanp::math;
 
-class ofile {
+double hj_mass;
+
+class mass_bin {
   std::ofstream f;
 public:
-  ofile(const char* name): f(name) { }
-  friend inline ofile& operator<<(ofile& f, double x) {
-    f.f.write(reinterpret_cast<const char*>(&x),sizeof(x));
-    return f;
+  void open(const std::string& name) { f.open(name); }
+  inline void operator()() {
+    f.write(reinterpret_cast<const char*>(&event),sizeof(event));
   }
 };
 
@@ -38,12 +42,14 @@ int main(int argc, char* argv[]) {
   std::vector<const char*> ifnames;
   const char* ofname;
   const char* tree_name = "t3";
+  std::vector<double> mass_edges;
 
   try {
     using namespace ivanp::po;
     if (program_options()
-      (ifnames,'i',"input ROOT BH ntuples",req(),pos())
-      (ofname,'o',"output file name",req())
+      (ifnames,'i',"input ROOT ntuples",req(),pos())
+      (ofname,'o',"output file name prefix",req())
+      (mass_edges,'b',"mass binning",req())
       (tree_name,{"-t","--tree"},cat("input TTree name [",tree_name,']'))
       .parse(argc,argv,true)) return 0;
   } catch (const std::exception& e) {
@@ -54,7 +60,7 @@ int main(int argc, char* argv[]) {
 
   // Open input ntuples root file ===================================
   TChain chain(tree_name);
-  cout << iftty("\033[33m") << "Input ntuples" << iftty("\033[0m") << endl;
+  cout << iftty("\033[34m") << "Input ntuples" << iftty("\033[0m") << endl;
   for (const char* name : ifnames) {
     if (!chain.Add(name,0)) return 1;
     cout << "  " << name << endl;
@@ -73,14 +79,18 @@ int main(int argc, char* argv[]) {
   float_or_double_array_reader _E (reader,"E" );
   float_or_double_value_reader _weight(reader,"weight2");
 
-  ofile f(ofname); // Output file
+  ivanp::binner<mass_bin, std::tuple<
+    ivanp::axis_spec<ivanp::container_axis<decltype(mass_edges)&>,0,0> >
+  > files(mass_edges);
 
-  vec4 Higgs, jets;
+  for (unsigned i=0, n=files.nbins(); i<n; ++i)
+    files.bins()[i].open(cat(ofname,'_',mass_edges[i],'-',mass_edges[i+1],".dat"));
 
   // LOOP ===========================================================
   using cnt = ivanp::timed_counter<Long64_t>;
   for (cnt ent(reader.GetEntries(true)); reader.Next(); ++ent) {
     // Read particles -----------------------------------------------
+    vec4 Higgs, jets;
     const unsigned np = *_nparticle;
     for (unsigned i=0; i<np; ++i) {
       if (_kf[i]==25) {
@@ -93,15 +103,17 @@ int main(int argc, char* argv[]) {
 
     const auto Q = Higgs + jets;
     const double Q2 = Q*Q;
-    const auto hj_mass = std::sqrt(Q2);
+    hj_mass = std::sqrt(Q2);
 
     const vec4 Z(0,0,Q[3],Q[2]);
     const auto ell = ((Q*jets)/Q2)*Higgs - ((Q*Higgs)/Q2)*jets;
 
-    const auto cos_theta = (ell*Z) / std::sqrt(sq(ell)*sq(Z));
+    event.cos_theta = (ell*Z) / std::sqrt(sq(ell)*sq(Z));
     // --------------------------------------------------------------
 
-    f << (*_weight) << hj_mass << cos_theta;
+    event.weight = (*_weight);
+
+    files(hj_mass);
   }
 }
 

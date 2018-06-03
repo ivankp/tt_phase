@@ -28,9 +28,7 @@ rpath_script := ldd $(shell root-config --libdir)/libTreePlayer.so \
   | sed -nr '/^(\/usr)?\/lib/!s/^/-Wl,-rpath=/p'
 ROOT_LDLIBS += $(shell $(rpath_script))
 
-CXXFLAGS += $(ROOT_CXXFLAGS)
 LDFLAGS += $(ROOT_LDFLAGS)
-LDLIBS += $(ROOT_LDLIBS) -lTreePlayer
 
 SRCS := $(shell find -L $(SRC) -type f -name '*$(EXT)')
 DEPS := $(patsubst $(SRC)/%$(EXT),$(BLD)/%.d,$(SRCS))
@@ -40,9 +38,15 @@ EXES := $(patsubst $(SRC)%$(EXT),$(BIN)%,$(shell $(GREP_EXES)))
 
 PO_OBJ := $(BLD)/ivanp/program_options/program_options.o
 
+C_vars := $(ROOT_CXXFLAGS)
+L_vars := $(ROOT_LDLIBS) -lTreePlayer
+
+C_fit := -fopenmp $(ROOT_CXXFLAGS)
+L_fit := -fopenmp $(ROOT_LDLIBS) -lMinuit
+
 all: $(EXES)
 
-$(BIN)/vars: $(PO_OBJ)
+$(BIN)/vars $(BIN)/fit: $(PO_OBJ)
 
 -include $(DEPS)
 
