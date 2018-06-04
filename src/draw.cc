@@ -15,6 +15,7 @@
 #include "ivanp/string.hh"
 #include "ivanp/math/math.hh"
 #include "ivanp/program_options.hh"
+#include "ivanp/expand.hh"
 
 #include "Legendre.hh"
 #include "iftty.hh"
@@ -32,6 +33,16 @@ using ivanp::math::sq;
 const char* par_name[NPAR] = {"c2","c4","c6","phi2"};
 
 const int colors[] = { 418, 2 };
+
+struct _tex: TLatex {
+  _tex() { SetTextSize(0.025); }
+  template <typename... F>
+  TLatex* operator()(int col, int row, const std::string& str, F... f) {
+    TLatex* p = DrawLatexNDC(0.15+0.2*col,0.85-0.04*row,str.c_str());
+    EXPAND(f(p));
+    return p;
+  }
+} tex;
 
 int main(int argc, char* argv[]) {
   std::vector<const char*> ifnames;
@@ -62,9 +73,6 @@ int main(int argc, char* argv[]) {
   pad1.SetMargin(0.05,0.05,0,0.1);
   TPad pad2("","",0,0,1,0.25);
   pad2.SetMargin(0.05,0.05,0.25,0);
-
-  TLatex latex;
-  latex.SetTextSize(0.025);
 
   const unsigned npages = ifnames.size();
   unsigned page_cnt = npages;
@@ -121,27 +129,20 @@ int main(int argc, char* argv[]) {
     if (y_range) ya->SetRangeUser((*y_range)[0],(*y_range)[1]);
     if (more_logy) ya->SetMoreLogLabels();
     h->Draw();
-    const double line0 = 0.85;
     for (unsigned fi=0; fi<fits.size(); ++fi) {
       auto& f = *fits[fi];
       f.Draw("SAME");
-      latex.DrawLatexNDC(0.15+0.2*fi,line0,cat(
-          f.GetName(), " fit").c_str())->SetTextColor(colors[fi]);
+      tex(fi,0,cat(f.GetName(), " fit"))->SetTextColor(colors[fi]);
       for (unsigned pi=0; pi<NPAR; ++pi) {
-        latex.DrawLatexNDC(0.15+0.2*fi,line0-0.04*(pi+1),cat(
-            f.GetParName(pi)," = ",f.GetParameter(pi),
-            (f.GetParError(pi)==0) ? " FIXED" : ""
-          ).c_str());
+        tex(fi,pi+1,cat(
+          f.GetParName(pi)," = ",f.GetParameter(pi),
+          (f.GetParError(pi)==0) ? " FIXED" : ""));
       }
-      latex.DrawLatexNDC(0.15+0.2*fi,line0-0.04*(NPAR+1),cat(
-          "#chi^{2}/ndf = ",
-          jfits[f.GetName()]["chi2"].get<double>() / (nbins-NPAR)
-        ).c_str());
-      latex.DrawLatexNDC(0.15+0.2*fi,line0-0.04*(NPAR+2),cat(
-          "-2logL = ", jfits[f.GetName()]["logl"]
-        ).c_str());
+      tex(fi,NPAR+1,cat("#chi^{2}/ndf = ",
+        jfits[f.GetName()]["chi2"].get<double>() / (nbins-NPAR) ));
+      tex(fi,NPAR+2,cat("-2logL = ", jfits[f.GetName()]["logl"]));
     }
-    latex.DrawLatexNDC(0.70,line0,cat("Events: ",h->GetEntries()).c_str());
+    tex(3,0,cat("Events: ",h->GetEntries()));
 
     canv.cd();
     pad1.Draw();
