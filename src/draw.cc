@@ -145,10 +145,10 @@ int main(int argc, char* argv[]) {
     tex(3,0,cat("Events: ",h.GetEntries()));
 
     pad2.cd(); // ===================================================
-    auto hrat = h;
-    hrat.SetXTitle(cat("cos #theta / ",cos_range).c_str());
-    hrat.Divide(&fits[0]);
-    hrat.Draw();
+    auto h_rat = h;
+    h_rat.SetXTitle(cat("cos #theta / ",cos_range).c_str());
+    h_rat.Divide(&fits[0]);
+    h_rat.Draw();
     std::vector<TF1> frats;
     frats.reserve(fits.size());
     frats.emplace_back("frat", ROOT::Math::ParamFunctor(
@@ -158,6 +158,14 @@ int main(int argc, char* argv[]) {
       frats[i].SetLineColor(fits[i].GetLineColor());
       frats[i].Draw("SAME");
     }
+
+    TAxis *ax = h_rat.GetXaxis();
+    TAxis *ay = h_rat.GetYaxis();
+    ax->SetLabelSize(0.1);
+    ay->SetLabelSize(0.1);
+    ax->SetTitleSize(0.1);
+    ax->SetTickLength(0.09);
+    ay->SetTickLength(0.02);
 
     canv.cd();
     pad1.Draw();
