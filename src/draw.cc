@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <memory>
 
 #include <boost/optional.hpp>
 
@@ -87,50 +88,49 @@ int main(int argc, char* argv[]) {
     const auto& jhist = json["hist"];
     const unsigned nbins = jhist.size();
 
-    TH1D* h = new TH1D("","",nbins,-1,1);
-    h->SetXTitle(cat("cos #theta / ",cos_range).c_str());
-    h->Sumw2();
+    TH1D h("","",nbins,-1,1);
+    h.Sumw2();
     { unsigned i = 1, n = 0;
-      auto& w2 = *h->GetSumw2();
+      auto& w2 = *h.GetSumw2();
       double sumw = 0;
       for (auto it=jhist.begin(); it!=jhist.end(); ++it, ++i) {
-        sumw += (*h)[i] = it->at(0);
+        sumw += h[i] = it->at(0);
         w2[i] = sq(it->at(1).get<double>());
         n += it->at(2).get<decltype(n)>();
       }
-      h->SetEntries(n);
-      h->Scale(1./(h->GetBinWidth(1)*sumw));
+      h.SetEntries(n);
+      h.Scale(1./(h.GetBinWidth(1)*sumw));
     }
-    h->SetLineWidth(2);
-    h->SetLineColor(602);
+    h.SetLineWidth(2);
+    h.SetLineColor(602);
 
-    std::vector<TF1*> fits;
+    std::vector<TF1> fits;
     const auto& jfits = json["fits"];
     fits.reserve(jfits.size());
     for (auto it=jfits.begin(); it!=jfits.end(); ++it) {
       cout << it.key() << endl;
-      TF1* f = new TF1(it.key().c_str(),
+      fits.emplace_back(it.key().c_str(),
         [](double* x, double* c){ return Legendre(*x,c); },
         -1,1,NPAR);
+      auto& f = fits.back();
       const auto& fit = it.value();
       for (unsigned i=0; i<NPAR; ++i) {
         const char* name = par_name[i];
-        f->SetParName(i,name);
+        f.SetParName(i,name);
         const std::array<double,2> p = fit.at(name);
-        f->SetParameter(i,p[0]);
-        f->SetParError(i,p[1]);
-        f->SetLineColor(colors[fits.size()]);
+        f.SetParameter(i,p[0]);
+        f.SetParError(i,p[1]);
+        f.SetLineColor(colors[fits.size()-1]);
       }
-      fits.push_back(f);
     }
 
-    pad1.cd();
-    TAxis* ya = h->GetYaxis();
+    pad1.cd(); // ===================================================
+    TAxis* ya = h.GetYaxis();
     if (y_range) ya->SetRangeUser((*y_range)[0],(*y_range)[1]);
     if (more_logy) ya->SetMoreLogLabels();
-    h->Draw();
+    h.Draw();
     for (unsigned fi=0; fi<fits.size(); ++fi) {
-      auto& f = *fits[fi];
+      auto& f = fits[fi];
       f.Draw("SAME");
       tex(fi,0,cat(f.GetName(), " fit"))->SetTextColor(colors[fi]);
       for (unsigned pi=0; pi<NPAR; ++pi) {
@@ -142,7 +142,22 @@ int main(int argc, char* argv[]) {
         jfits[f.GetName()]["chi2"].get<double>() / (nbins-NPAR) ));
       tex(fi,NPAR+2,cat("-2logL = ", jfits[f.GetName()]["logl"]));
     }
-    tex(3,0,cat("Events: ",h->GetEntries()));
+    tex(3,0,cat("Events: ",h.GetEntries()));
+
+    pad2.cd(); // ===================================================
+    auto hrat = h;
+    hrat.SetXTitle(cat("cos #theta / ",cos_range).c_str());
+    hrat.Divide(&fits[0]);
+    hrat.Draw();
+    std::vector<TF1> frats;
+    frats.reserve(fits.size());
+    frats.emplace_back("frat", ROOT::Math::ParamFunctor(
+      [&](double* x,double*){ return fits[0](x)/fits[1](x); }),-1,1);
+    frats.emplace_back("one",[](double*,double*){ return 1.; },-1,1);
+    for (unsigned i=0; i<frats.size(); ++i) {
+      frats[i].SetLineColor(fits[i].GetLineColor());
+      frats[i].Draw("SAME");
+    }
 
     canv.cd();
     pad1.Draw();
