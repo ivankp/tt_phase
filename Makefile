@@ -28,6 +28,8 @@ rpath_script := ldd $(shell root-config --libdir)/libTreePlayer.so \
   | sed -nr '/^(\/usr)?\/lib/!s/^/-Wl,-rpath=/p'
 ROOT_LDLIBS += $(shell $(rpath_script))
 
+ROOT_NOLIBS := $(shell sed 's/ -[lr][^ ]\+//g' <<< '$(ROOT_LDLIBS)')
+
 LDFLAGS += $(ROOT_LDFLAGS)
 
 SRCS := $(shell find -L $(SRC) -type f -name '*$(EXT)')
@@ -42,11 +44,14 @@ C_vars := $(ROOT_CXXFLAGS)
 L_vars := $(ROOT_LDLIBS) -lTreePlayer
 
 C_fit := -fopenmp $(ROOT_CXXFLAGS)
-L_fit := -fopenmp $(ROOT_LDLIBS) -lMinuit
+L_fit := -fopenmp $(ROOT_NOLIBS) -lCore -lMinuit
+
+C_draw := $(ROOT_CXXFLAGS)
+L_draw := $(ROOT_LDLIBS)
 
 all: $(EXES)
 
-$(BIN)/vars $(BIN)/fit: $(PO_OBJ)
+$(EXES): $(PO_OBJ)
 
 -include $(DEPS)
 

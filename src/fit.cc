@@ -6,8 +6,6 @@
 
 #include <boost/optional.hpp>
 
-#include <TFitResult.h>
-
 #include "ivanp/string.hh"
 #include "ivanp/math/math.hh"
 #include "ivanp/program_options.hh"

@@ -1,6 +1,7 @@
 #ifndef LEGENDRE_HH
 #define LEGENDRE_HH
 
+#include <complex>
 #include "ivanp/math/math.hh"
 
 // (Sum[c(k) LegendreP[k,x], {k, 0, 6, 2}])^2
