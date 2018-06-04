@@ -66,11 +66,11 @@ int main(int argc, char* argv[]) {
   // ================================================================
 
   TCanvas canv("","",700,600);
-  if (logy) canv.SetLogy();
   gStyle->SetOptStat(0);
 
   TPad pad1("","",0,0.25,1,1);
   pad1.SetMargin(0.05,0.05,0,0.1);
+  if (logy) pad1.SetLogy();
   TPad pad2("","",0,0,1,0.25);
   pad2.SetMargin(0.05,0.05,0.25,0);
 
