@@ -135,6 +135,7 @@ int main(int argc, char* argv[]) {
       tex(fi,0,cat(f.GetName(), " fit"))->SetTextColor(colors[fi]);
       for (unsigned pi=0; pi<NPAR; ++pi) {
         tex(fi,pi+1,cat(
+          ivanp::starts_with(f.GetParName(pi),"phi") ? "#" : "",
           f.GetParName(pi)," = ",f.GetParameter(pi),
           (f.GetParError(pi)==0) ? " FIXED" : ""));
       }
@@ -147,7 +148,7 @@ int main(int argc, char* argv[]) {
     pad2.cd(); // ===================================================
     auto h_rat = h;
     h_rat.SetXTitle(cat("cos #theta / ",cos_range).c_str());
-    h_rat.Divide(&fits[0]);
+    h_rat.Divide(&fits[1]);
     h_rat.Draw();
     std::vector<TF1> frats;
     frats.reserve(fits.size());
@@ -173,6 +174,7 @@ int main(int argc, char* argv[]) {
 
     if (!--page_cnt && npages>1) ofname += ')';
     canv.Print(ofname.c_str());
+    // canv.Print(ofname.c_str(),("Title:"+std::string(name,1,name.size()-2)).c_str());
     if (page_cnt==npages-1 && npages>1) ofname.pop_back();
   }
 }

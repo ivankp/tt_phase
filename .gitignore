@@ -5,6 +5,10 @@
 !README*
 !include/
 !src/
-!scripts/
+
+!run/
+run/*
+!run/run.sh
+!run/*.json
 
 **.swp

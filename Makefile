@@ -1,8 +1,8 @@
 SHELL := bash
 CXX := g++
 CPPFLAGS := -std=c++14 -Iinclude
-CXXFLAGS := -Wall -O3 $(CPPFLAGS) -fmax-errors=3
-# CXXFLAGS := -Wall -g $(CPPFLAGS) -fmax-errors=3
+CXXFLAGS := -Wall -O3 -fmax-errors=3 $(CPPFLAGS)
+# CXXFLAGS := -Wall -g -fmax-errors=3 $(CPPFLAGS)
 LDFLAGS :=
 LDLIBS :=
 
@@ -17,7 +17,7 @@ ifeq (0, $(words $(findstring $(MAKECMDGOALS), clean)))
 
 LDFLAGS += $(shell sed -r 's/([^:]+)(:|$$)/ -L\1/g' <<< "$$LIBRARY_PATH")
 
-ROOT_CXXFLAGS := $(shell root-config --cflags | sed 's/ -std=c++[^ ]\+ / /')
+ROOT_CXXFLAGS := $(shell root-config --cflags | sed 's/ -std=c++[^ ]\+//')
 ROOT_LDFLAGS  := $(shell root-config --ldflags)
 ROOT_LDLIBS   := $(shell root-config --libs)
 
@@ -52,6 +52,7 @@ L_draw := $(ROOT_LDLIBS)
 all: $(EXES)
 
 $(EXES): $(PO_OBJ)
+$(BIN)/vars: $(BLD)/glob.o
 
 -include $(DEPS)
 

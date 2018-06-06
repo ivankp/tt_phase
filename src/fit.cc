@@ -197,10 +197,8 @@ int main(int argc, char* argv[]) {
   out << "{\"cos_range\":" << cos_range;
   out << std::scientific;
   out << ",\n \"fits\":{\n  \"chi2\":{";
-  bool first = true;
   for (unsigned i=0; i<NPAR; ++i) {
-    if (!first) out << ',';
-    else first = false;
+    if (i) out << ',';
     if (!(i%2)) out << "\n    ";
     out << "\"" << par_name[i] << "\":["
         << chi2_pars[i] <<','<< chi2_errs[i] << "]";
@@ -208,10 +206,8 @@ int main(int argc, char* argv[]) {
   out << ",\n    \"chi2\":" << fChi2(chi2_pars)
       << ",\"logl\":" << fLogL(chi2_pars)
       << "},\n  \"logl\":{";
-  first = true;
   for (unsigned i=0; i<NPAR; ++i) {
-    if (!first) out << ',';
-    else first = false;
+    if (i) out << ',';
     if (!(i%2)) out << "\n    ";
     out << "\"" << par_name[i] << "\":["
         << logl_pars[i] <<','<< logl_errs[i] << "]";
@@ -219,7 +215,7 @@ int main(int argc, char* argv[]) {
   out << ",\n    \"chi2\":" << fChi2(logl_pars)
       << ",\"logl\":" << fLogL(logl_pars)
       << "}},\n \"hist\":[";
-  first = true;
+  bool first = true;
   for (auto& b : hist.bins()) {
     if (!first) out << ',';
     else first = false;

@@ -6,6 +6,8 @@
 #include <TTreeReaderValue.h>
 #include <TTreeReaderArray.h>
 
+#include "json.hpp"
+
 #include "ivanp/string.hh"
 #include "ivanp/math/math.hh"
 #include "ivanp/program_options.hh"
@@ -16,6 +18,7 @@
 #include "iftty.hh"
 #include "vec4.hh"
 #include "event.hh"
+#include "glob.hh"
 
 #define TEST(var) \
   std::cout << "\033[36m" #var "\033[0m = " << var << std::endl;
@@ -30,37 +33,51 @@ using namespace ivanp::math;
 class mass_bin {
   std::ofstream f;
 public:
-  void open(const std::string& name) { f.open(name); }
+  std::ofstream& open(const std::string& name) { f.open(name); return f; }
   inline void operator()() {
     f.write(reinterpret_cast<const char*>(&event),sizeof(event));
   }
 };
 
 int main(int argc, char* argv[]) {
-  std::vector<const char*> ifnames;
-  const char* ofname;
-  const char* tree_name = "t3";
+  const char *ifname, *ofname;
+  const char *tree_name = "t3";
   std::vector<double> mass_edges;
 
   try {
     using namespace ivanp::po;
     if (program_options()
-      (ifnames,'i',"input ROOT ntuples",req(),pos())
+      (ifname,'i',"input JSON config file",req(),pos())
       (ofname,'o',"output file name prefix",req())
       (mass_edges,'b',"mass binning",req())
       (tree_name,{"-t","--tree"},cat("input TTree name [",tree_name,']'))
       .parse(argc,argv,true)) return 0;
   } catch (const std::exception& e) {
-    std::cerr << iftty("\033[31m",2) << e.what() << iftty("\033[0m",2) << endl;
+    cerr << iftty("\033[31m",2) << e.what() << iftty("\033[0m",2) << endl;
     return 1;
   }
   // ================================================================
 
+  nlohmann::json info;
+  std::ifstream(ifname) >> info;
+
+  std::vector<std::string> ifnames;
+  for (const std::string& f : info["files"]) {
+    auto fs = ivanp::glob(f);
+    if (fs.empty())
+      throw std::runtime_error(cat("glob \"",f,"\" matched no files"));
+    ifnames.insert(
+      ifnames.end(),
+      std::make_move_iterator(fs.begin()),
+      std::make_move_iterator(fs.end()));
+  }
+  info["files"] = ifnames;
+
   // Open input ntuples root file ===================================
   TChain chain(tree_name);
   cout << iftty("\033[34m") << "Input ntuples" << iftty("\033[0m") << endl;
-  for (const char* name : ifnames) {
-    if (!chain.Add(name,0)) return 1;
+  for (const std::string& name : ifnames) {
+    if (!chain.Add(name.c_str(),0)) return 1;
     cout << "  " << name << endl;
   }
   cout << endl;
@@ -81,8 +98,13 @@ int main(int argc, char* argv[]) {
     ivanp::axis_spec<ivanp::container_axis<decltype(mass_edges)&>,0,0> >
   > files(mass_edges);
 
-  for (unsigned i=0, n=files.nbins(); i<n; ++i)
-    files.bins()[i].open(cat(ofname,'_',mass_edges[i],'-',mass_edges[i+1],".dat"));
+  for (unsigned i=0, n=files.nbins(); i<n; ++i) {
+    auto& f = files.bins()[i].open(
+      cat(ofname,'_',mass_edges[i],'-',mass_edges[i+1],".dat"));
+
+    info["M"] = { mass_edges[i], mass_edges[i+1] };
+    f << info << endl;
+  }
 
   // LOOP ===========================================================
   using cnt = ivanp::timed_counter<Long64_t>;
