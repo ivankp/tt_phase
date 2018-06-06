@@ -3,12 +3,13 @@
 mkdir -p dat fit
 
 for f in $(ls | grep '.json$'); do
-  if [ "$f" -nt "dat" ] || \
-     [ -z "$(ls -A dat)" ] || \
+  base=$(basename $f .json)
+  newer="$(find dat -name "${base}*" -not -newer $f)"
+  if [ -n "$newer" ] || \
      [ "../bin/vars" -nt "dat" ]
   then
     echo $f
-    ../bin/vars $f -o dat/$(basename $f .json) \
+    ../bin/vars $f -o dat/$base \
       -b 200 250 300 350 400 450 500 550
   fi
 done
@@ -19,6 +20,8 @@ for f in $(ls dat | grep '.dat$'); do
     if [ -n "$phi" ]; then
       ofname+="_phi$phi"
       phi_arg="--phi=$phi"
+    else
+      phi_arg=''
     fi
     ofname+=".json"
     if [ ! -f "$ofname" ] || \
