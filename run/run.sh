@@ -6,6 +6,7 @@ for f in $(ls | grep '.json$'); do
   base=$(basename $f .json)
   newer="$(find dat -name "${base}*" -not -newer $f)"
   if [ -n "$newer" ] || \
+     [ -z "$(find dat -name "${base}*")" ] || \
      [ "../bin/vars" -nt "dat" ]
   then
     echo $f
