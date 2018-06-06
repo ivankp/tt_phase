@@ -6,6 +6,8 @@
 
 #include <boost/optional.hpp>
 
+#include "json.hpp"
+
 #include "ivanp/string.hh"
 #include "ivanp/math/math.hh"
 #include "ivanp/program_options.hh"
@@ -90,12 +92,18 @@ int main(int argc, char* argv[]) {
     ivanp::axis_spec<ivanp::uniform_axis<double>,0,0> >
   > hist({nbins,-1,1});
 
+  nlohmann::json info;
+
   timer.start();
 
   for (auto& ifname : ifnames) {
     cout << iftty("\033[34m") << "Input file" << iftty("\033[0m")
          << ": " << ifname << endl;
-    for (std::ifstream f(ifname); f; ) {
+    std::ifstream f(ifname);
+    std::string line;
+    std::getline(f,line);
+    info.merge_patch(nlohmann::json::parse(line));
+    while (f) {
       f.read(reinterpret_cast<char*>(&event),sizeof(event));
       if (std::abs(event.cos_theta) > cos_range) continue;
       event.cos_theta /= cos_range;
@@ -193,8 +201,9 @@ int main(int argc, char* argv[]) {
 
   // Write output ===================================================
   std::ofstream out(ofname);
+  out << "{\"info\":" << info.dump(2);
   out << std::setprecision(8);
-  out << "{\"cos_range\":" << cos_range;
+  out << ",\n \"cos_range\":" << cos_range;
   out << std::scientific;
   out << ",\n \"fits\":{\n  \"chi2\":{";
   for (unsigned i=0; i<NPAR; ++i) {

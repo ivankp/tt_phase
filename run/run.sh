@@ -3,7 +3,10 @@
 mkdir -p dat fit
 
 for f in $(ls | grep '.json$'); do
-  if [ "$f" -nt "dat" ] || [ -z "$(ls -A dat)" ]; then
+  if [ "$f" -nt "dat" ] || \
+     [ -z "$(ls -A dat)" ] || \
+     [ "../bin/vars" -nt "dat" ]
+  then
     echo $f
     ../bin/vars $f -o dat/$(basename $f .json) \
       -b 200 250 300 350 400 450 500 550
@@ -18,10 +21,22 @@ for f in $(ls dat | grep '.dat$'); do
       phi_arg="--phi=$phi"
     fi
     ofname+=".json"
-    if [ ! -f "$ofname" ] || [ "$f" -nt "$ofname" ]; then
-      ../bin/fit dat/$f -o $ofname \
-        --print-level=-1 -r0.8 $phi_arg
+    if [ ! -f "$ofname" ] || \
+       [ "dat/$f" -nt "$ofname" ] || \
+       [ "$ofname" -ot "../bin/fit" ]
+    then
+      ../bin/fit dat/$f -o $ofname --print-level=-1 -r0.8 $phi_arg
     fi
   done
+done
+
+for f in $(ls | grep '.json$'); do
+  base=$(basename $f .json)
+  pdf=${base}.pdf
+  if [ ! -f "$pdf" ] || \
+     [ -n "$(find fit -name "${base}*" -newer $pdf | sort)" ]
+  then
+    ../bin/draw $(find fit -name "${base}*" | sort) -o $pdf -y 0.2:1.4
+  fi
 done
 
