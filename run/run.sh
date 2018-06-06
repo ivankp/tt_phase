@@ -4,10 +4,9 @@ mkdir -p dat fit
 
 for f in $(ls | grep '.json$'); do
   base=$(basename $f .json)
-  newer="$(find dat -name "${base}*" -not -newer $f)"
-  if [ -n "$newer" ] || \
-     [ -z "$(find dat -name "${base}*")" ] || \
-     [ "../bin/vars" -nt "dat" ]
+  if [ -z "$(find dat -name "${base}*")" ] || \
+     [ -n "$(find dat -name "${base}*" -not -newer $f)" ] || \
+     [ -n "$(find dat -name "${base}*" -not -newer ../bin/vars)" ]
   then
     echo $f
     ../bin/vars $f -o dat/$base \
@@ -26,7 +25,7 @@ for f in $(ls dat | grep '.dat$'); do
     fi
     ofname+=".json"
     if [ ! -f "$ofname" ] || \
-       [ "dat/$f" -nt "$ofname" ] || \
+       [ "$ofname" -ot "dat/$f" ] || \
        [ "$ofname" -ot "../bin/fit" ]
     then
       ../bin/fit dat/$f -o $ofname --print-level=-1 -r0.8 $phi_arg
@@ -38,7 +37,8 @@ for f in $(ls | grep '.json$'); do
   base=$(basename $f .json)
   pdf=${base}.pdf
   if [ ! -f "$pdf" ] || \
-     [ -n "$(find fit -name "${base}*" -newer $pdf | sort)" ]
+     [ -n "$(find fit -name "${base}*" -newer $pdf)" ] || \
+     [ "$pdf" -ot "../bin/draw" ]
   then
     ../bin/draw $(find fit -name "${base}*" | sort) -o $pdf -y 0.2:1.4
   fi
