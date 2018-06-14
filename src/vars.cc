@@ -6,6 +6,8 @@
 #include <TTreeReaderValue.h>
 #include <TTreeReaderArray.h>
 
+#include <fastjet/ClusterSequence.hh>
+
 #include "json.hpp"
 
 #include "ivanp/string.hh"

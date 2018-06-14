@@ -88,7 +88,8 @@ int main(int argc, char* argv[]) {
     const auto& jhist = json["hist"];
     const unsigned nbins = jhist.size();
 
-    TH1D h("","",nbins,-1,1);
+    const std::array<double,2> M = json["info"]["M"];
+    TH1D h("",cat("M #in [",M[0],',',M[1],") GeV").c_str(),nbins,-1,1);
     h.Sumw2();
     { unsigned i = 1, n = 0;
       auto& w2 = *h.GetSumw2();
@@ -147,7 +148,7 @@ int main(int argc, char* argv[]) {
 
     pad2.cd(); // ===================================================
     auto h_rat = h;
-    h_rat.SetXTitle(cat("cos #theta / ",cos_range).c_str());
+    h_rat.SetTitle(cat(";cos #theta / ",cos_range).c_str());
     h_rat.Divide(&fits[1]);
     h_rat.Draw();
     std::vector<TF1> frats;
@@ -173,8 +174,7 @@ int main(int argc, char* argv[]) {
     pad2.Draw();
 
     if (!--page_cnt && npages>1) ofname += ')';
-    canv.Print(ofname.c_str());
-    // canv.Print(ofname.c_str(),("Title:"+std::string(name,1,name.size()-2)).c_str());
+    canv.Print(ofname.c_str(),cat("Title:",M[0],'-',M[1]).c_str());
     if (page_cnt==npages-1 && npages>1) ofname.pop_back();
   }
 }

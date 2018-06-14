@@ -10,7 +10,7 @@ for f in $(ls | grep '.json$'); do
   then
     echo $f
     ../bin/vars $f -o dat/$base \
-      -b 200 250 300 350 400 450 500 550
+      -b 200 250 300 350 400 450 500
   fi
 done
 
