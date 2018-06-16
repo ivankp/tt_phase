@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 mkdir -p dat fit
 
 for f in $(ls | grep '.json$'); do

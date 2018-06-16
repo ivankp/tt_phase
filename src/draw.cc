@@ -35,15 +35,13 @@ const char* par_name[NPAR] = {"c2","c4","c6","phi2"};
 
 const int colors[] = { 418, 2 };
 
-struct _tex: TLatex {
-  _tex() { SetTextSize(0.025); }
-  template <typename... F>
-  TLatex* operator()(int col, int row, const std::string& str, F... f) {
-    TLatex* p = DrawLatexNDC(0.15+0.2*col,0.85-0.04*row,str.c_str());
-    EXPAND(f(p));
-    return p;
-  }
-} tex;
+TLatex _tex;
+template <typename... F>
+TLatex* tex(int col, int row, const std::string& str, F... f) {
+  TLatex* p = _tex.DrawLatexNDC(0.15+0.2*col,0.85-0.04*row,str.c_str());
+  EXPAND(f(p));
+  return p;
+}
 
 int main(int argc, char* argv[]) {
   std::vector<const char*> ifnames;
@@ -68,6 +66,7 @@ int main(int argc, char* argv[]) {
 
   TCanvas canv("","",700,600);
   gStyle->SetOptStat(0);
+  _tex.SetTextSize(0.025);
 
   TPad pad1("","",0,0.25,1,1);
   pad1.SetMargin(0.05,0.05,0,0.1);
@@ -83,12 +82,13 @@ int main(int argc, char* argv[]) {
     cout << ifname << endl;
     nlohmann::json json;
     std::ifstream(ifname) >> json;
+    auto& info = json["info"];
 
     const double cos_range = json["cos_range"];
     const auto& jhist = json["hist"];
     const unsigned nbins = jhist.size();
 
-    const std::array<double,2> M = json["info"]["M"];
+    const std::array<double,2> M = info["M"];
     TH1D h("",cat("M #in [",M[0],',',M[1],") GeV").c_str(),nbins,-1,1);
     h.Sumw2();
     { unsigned i = 1, n = 0;
@@ -144,7 +144,25 @@ int main(int argc, char* argv[]) {
         jfits[f.GetName()]["chi2"].get<double>() / (nbins-NPAR) ));
       tex(fi,NPAR+2,cat("-2logL = ", jfits[f.GetName()]["logl"]));
     }
-    tex(3,0,cat("Events: ",h.GetEntries()));
+
+    tex(2,0,cat('H',info["njets"].get<unsigned>(),
+                "j ",info["part"].get<std::string>()));
+    tex(2,1,cat("Mtop: ",info["mtop"].get<std::string>()));
+    auto& jet_info = info["jet"];
+    if (!jet_info.is_null()) {
+      unsigned i = 1;
+      auto& alg = jet_info["alg"];
+      if (!alg.is_null())
+        tex(2,++i,cat(
+          "jet alg: ",alg[0].get<std::string>()," R=",alg[1].get<double>()));
+      auto& cuts = jet_info["cuts"];
+      if (!cuts.is_null())
+        for (auto it=cuts.begin(); it!=cuts.end(); ++it)
+          tex(2,++i,cat("jet ",it.key()," cut: ",it.value()));
+    }
+
+    tex(3,0,cat("N events: ",(long unsigned)h.GetEntries()));
+    tex(3,1,cat("N bins: ",h.GetNbinsX()));
 
     pad2.cd(); // ===================================================
     auto h_rat = h;

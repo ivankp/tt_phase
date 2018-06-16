@@ -21,6 +21,10 @@ ROOT_CXXFLAGS := $(shell root-config --cflags | sed 's/ -std=c++[^ ]\+//')
 ROOT_LDFLAGS  := $(shell root-config --ldflags)
 ROOT_LDLIBS   := $(shell root-config --libs)
 
+FJ_PREFIX   := $(shell fastjet-config --prefix)
+FJ_CXXFLAGS := -I$(FJ_PREFIX)/include
+FJ_LDLIBS   := -L$(FJ_PREFIX)/lib -Wl,-rpath=$(FJ_PREFIX)/lib -lfastjet
+
 # RPATH
 rpath_script := ldd $(shell root-config --libdir)/libTreePlayer.so \
   | sed -nr 's|.*=> (.+)/.+\.so[.0-9]* \(.*|\1|p' \
@@ -40,8 +44,8 @@ EXES := $(patsubst $(SRC)%$(EXT),$(BIN)%,$(shell $(GREP_EXES)))
 
 PO_OBJ := $(BLD)/ivanp/program_options/program_options.o
 
-C_vars := $(ROOT_CXXFLAGS)
-L_vars := $(ROOT_LDLIBS) -lTreePlayer
+C_vars := $(ROOT_CXXFLAGS) $(FJ_CXXFLAGS)
+L_vars := $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS)
 
 C_fit := -fopenmp $(ROOT_CXXFLAGS)
 L_fit := -fopenmp $(ROOT_NOLIBS) -lCore -lMinuit

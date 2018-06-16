@@ -1,5 +1,8 @@
 #include <iostream>
 #include <fstream>
+#include <functional>
+
+#include <boost/optional.hpp>
 
 #include <TChain.h>
 #include <TTreeReader.h>
@@ -17,10 +20,10 @@
 #include "ivanp/binner.hh"
 
 #include "float_or_double_reader.hh"
-#include "iftty.hh"
 #include "vec4.hh"
 #include "event.hh"
 #include "glob.hh"
+#include "iftty.hh"
 
 #define TEST(var) \
   std::cout << "\033[36m" #var "\033[0m = " << var << std::endl;
@@ -31,6 +34,32 @@ using std::endl;
 using std::get;
 using ivanp::cat;
 using namespace ivanp::math;
+namespace fj = fastjet;
+
+int strcmpi(const char* s1, const char* s2) {
+  for (;;++s1,++s2) {
+    if (toupper(*s1)!=toupper(*s2)) return (*s1-*s2);
+    if (*s1=='\0') return 0;
+  }
+}
+
+namespace nlohmann {
+template <>
+struct adl_serializer<fj::JetAlgorithm> {
+  static void from_json(const json& j, fj::JetAlgorithm& alg) {
+    const std::string str = j;
+    const char* arg = str.c_str();
+    if (!strcmpi(arg,"kt"))
+      alg = fj::kt_algorithm;
+    else if (!strcmpi(arg,"antikt") || !strcmpi(arg,"akt"))
+      alg = fj::antikt_algorithm;
+    else if (!strcmpi(arg,"cambridge") || !strcmpi(arg,"ca"))
+      alg = fj::cambridge_algorithm;
+    else throw std::runtime_error(cat(
+      "cannot interpret \"",arg,"\" as a FastJet algorithm"));
+  }
+};
+}
 
 class mass_bin {
   std::ofstream f;
@@ -108,26 +137,75 @@ int main(int argc, char* argv[]) {
     f << info << endl;
   }
 
+  const auto& jet_info = info["jet"];
+  boost::optional<fj::JetDefinition> jet_alg;
+  std::vector<std::function<bool(fj::PseudoJet)>> jet_cuts;
+
+  if (!jet_info.is_null()) {
+    const auto& jet_alg_info = jet_info["alg"];
+    jet_alg.emplace(
+      jet_alg_info[0].get<fj::JetAlgorithm>(),
+      jet_alg_info[1].get<double>());
+    const auto& jet_cuts_info = jet_info["cuts"];
+    if (!jet_cuts_info.is_null()) { // jet cuts ---------------------
+      for (auto it=jet_cuts_info.begin(); it!=jet_cuts_info.end(); ++it) {
+        const double val = it.value();
+        const auto&  var = it.key();
+        if (var=="pt") jet_cuts.emplace_back([=](const auto& jet){
+            return jet.pt() < val;
+          }); else
+        if (var=="eta") jet_cuts.emplace_back([=](const auto& jet){
+            return jet.eta() > val;
+          }); else
+        if (var=="x") jet_cuts.emplace_back([=,R=jet_alg->R()](const auto& jet){
+            return (jet.m()/(R*jet.pt())) < val;
+          });
+      }
+    }
+  }
+
+  if (jet_alg) {
+    fastjet::ClusterSequence::print_banner(); // get it out of the way
+    cout << jet_alg->description() <<'\n'<< endl;
+  }
+  std::vector<fj::PseudoJet> particles;
+
   // LOOP ===========================================================
   using cnt = ivanp::timed_counter<Long64_t>;
   for (cnt ent(reader.GetEntries(true)); reader.Next(); ++ent) {
     // Read particles -----------------------------------------------
-    vec4 Higgs, jets;
+    vec4 Higgs;
+    particles.clear();
     const unsigned np = *_nparticle;
     for (unsigned i=0; i<np; ++i) {
       if (_kf[i]==25) {
         Higgs = {_px[i],_py[i],_pz[i],_E[i]};
       } else {
-        jets += {_px[i],_py[i],_pz[i],_E[i]};
+        particles.emplace_back(_px[i],_py[i],_pz[i],_E[i]);
       }
     }
     // --------------------------------------------------------------
 
-    const auto Q = Higgs + jets;
+    // Cluster jets -------------------------------------------------
+    auto fj_jets = (jet_alg && particles.size() > 1)
+     ? fj::ClusterSequence(particles,*jet_alg).inclusive_jets()
+     : particles;
+    for (auto it=fj_jets.end(); it!=fj_jets.begin(); ) { // apply cuts
+      --it;
+      for (const auto& cut : jet_cuts)
+        if (cut(*it)) { fj_jets.erase(it); break; }
+    }
+    if (fj_jets.empty()) continue;
+    std::sort( fj_jets.begin(), fj_jets.end(), // sort by pT
+      [](const auto& a, const auto& b){ return ( a.pt() > b.pt() ); });
+    // --------------------------------------------------------------
+    const vec4 jet = fj_jets.front();
+
+    const auto Q = Higgs + jet;
     const double Q2 = Q*Q; // Mass^2
 
     const vec4 Z(0,0,Q[3],Q[2]);
-    const auto ell = ((Q*jets)/Q2)*Higgs - ((Q*Higgs)/Q2)*jets;
+    const auto ell = ((Q*jet)/Q2)*Higgs - ((Q*Higgs)/Q2)*jet;
 
     event.cos_theta = (ell*Z) / std::sqrt(sq(ell)*sq(Z));
     // --------------------------------------------------------------

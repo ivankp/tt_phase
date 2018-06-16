@@ -7,6 +7,8 @@ class vec4 {
 public:
   vec4(): v{0,0,0,0} { }
   vec4(double x, double y, double z, double t): v{x,y,z,t} { }
+  template <typename J>
+  vec4(const J& j): v{j[0],j[1],j[2],j[3]} { }
 
   inline double operator[](unsigned i) const noexcept { return v[i]; }
   inline double& operator[](unsigned i) noexcept { return v[i]; }
