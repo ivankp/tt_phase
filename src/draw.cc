@@ -161,7 +161,12 @@ int main(int argc, char* argv[]) {
           tex(2,++i,cat("jet ",it.key()," cut: ",it.value()));
     }
 
-    tex(3,0,cat("N events: ",(long unsigned)h.GetEntries()));
+    auto nevents_str = std::to_string((long unsigned)h.GetEntries());
+    for (unsigned i=0, n=nevents_str.size(); n; ++i,--n) {
+      if (i==3) i=0, nevents_str.insert(n,1,' ');
+    }
+
+    tex(3,0,cat("N events: ",nevents_str));
     tex(3,1,cat("N bins: ",h.GetNbinsX()));
 
     pad2.cd(); // ===================================================

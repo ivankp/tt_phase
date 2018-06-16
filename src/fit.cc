@@ -137,44 +137,12 @@ int main(int argc, char* argv[]) {
     return chi2;
   };
 
-  double chi2_pars[NPAR], chi2_errs[NPAR];
+  std::array<double,NPAR>
+    chi2_pars { 0, 0, 0, fix_phi ? *fix_phi : 0 },
+    chi2_errs;
 
-  { auto m = make_minuit(NPAR,fChi2);
-    m.SetPrintLevel(print_level);
-
-    for (unsigned i=0; i<NPAR; ++i)
-      m.DefineParameter(
-        i,           // parameter number
-        par_name[i], // parameter name
-        (i==3 && fix_phi ? *fix_phi : 0), // start value
-        0.01,        // step size
-        -0.5,        // mininum
-        1.5          // maximum
-      );
-
-    if (fix_phi) m.FixParameter(3);
-
-    m.Migrad();
-    for (unsigned i=0; i<NPAR; ++i)
-      m.GetParameter(i,chi2_pars[i],chi2_errs[i]);
-  }
-
-  timer.print("Chi2 fit time");
-  timer.start();
-
-  // LogL fit =====================================================
-  auto fLogL = [&](const double* c) -> double {
-    long double logl = 0.;
-    const unsigned n = events.size();
-    #pragma omp parallel for reduction(+:logl)
-    for (unsigned i=0; i<n; ++i)
-      logl += events[i].weight*std::log(Legendre(events[i].cos_theta,c));
-    return -2.*logl;
-  };
-
-  double logl_pars[NPAR], logl_errs[NPAR];
-
-  { auto m = make_minuit(NPAR,fLogL);
+  auto fit_Chi2 = [&]{
+    auto m = make_minuit(NPAR,fChi2);
     m.SetPrintLevel(print_level);
 
     for (unsigned i=0; i<NPAR; ++i)
@@ -191,13 +159,54 @@ int main(int argc, char* argv[]) {
 
     m.Migrad();
     for (unsigned i=0; i<NPAR; ++i)
+      m.GetParameter(i,chi2_pars[i],chi2_errs[i]);
+  };
+  fit_Chi2();
+
+  timer.print("Chi2 fit time");
+  timer.start();
+
+  // LogL fit =====================================================
+  auto fLogL = [&](const double* c) -> double {
+    long double logl = 0.;
+    const unsigned n = events.size();
+    #pragma omp parallel for reduction(+:logl)
+    for (unsigned i=0; i<n; ++i)
+      logl += events[i].weight*std::log(Legendre(events[i].cos_theta,c));
+    return -2.*logl;
+  };
+
+  std::array<double,NPAR> logl_pars(chi2_pars), logl_errs;
+
+  auto fit_LogL = [&]{
+    auto m = make_minuit(NPAR,fLogL);
+    m.SetPrintLevel(print_level);
+
+    for (unsigned i=0; i<NPAR; ++i)
+      m.DefineParameter(
+        i,           // parameter number
+        par_name[i], // parameter name
+        logl_pars[i],// start value
+        0.01,        // step size
+        -0.5,        // mininum
+        1.5          // maximum
+      );
+
+    if (fix_phi) m.FixParameter(3);
+
+    m.Migrad();
+    for (unsigned i=0; i<NPAR; ++i)
       m.GetParameter(i,logl_pars[i],logl_errs[i]);
+  };
+  fit_LogL();
+
+  if (fChi2(chi2_pars.data())/fChi2(logl_pars.data()) > 2.) {
+    cout << "Redoing Chi2 fit" << endl;
+    chi2_pars = logl_pars;
+    fit_Chi2();
   }
 
   timer.print("LogL fit time");
-
-  // for (auto& b : chi2_data)
-  //   cout << b[0] << ' ' << Legendre(b[2],pars) << endl;
 
   // Write output ===================================================
   std::ofstream out(ofname);
@@ -212,8 +221,8 @@ int main(int argc, char* argv[]) {
     out << "\"" << par_name[i] << "\":["
         << chi2_pars[i] <<','<< chi2_errs[i] << "]";
   }
-  out << ",\n    \"chi2\":" << fChi2(chi2_pars)
-      << ",\"logl\":" << fLogL(chi2_pars)
+  out << ",\n    \"chi2\":" << fChi2(chi2_pars.data())
+      << ",\"logl\":" << fLogL(chi2_pars.data())
       << "},\n  \"logl\":{";
   for (unsigned i=0; i<NPAR; ++i) {
     if (i) out << ',';
@@ -221,8 +230,8 @@ int main(int argc, char* argv[]) {
     out << "\"" << par_name[i] << "\":["
         << logl_pars[i] <<','<< logl_errs[i] << "]";
   }
-  out << ",\n    \"chi2\":" << fChi2(logl_pars)
-      << ",\"logl\":" << fLogL(logl_pars)
+  out << ",\n    \"chi2\":" << fChi2(logl_pars.data())
+      << ",\"logl\":" << fLogL(logl_pars.data())
       << "}},\n \"hist\":[";
   bool first = true;
   for (auto& b : hist.bins()) {
